@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Foundry — local lead intelligence for agencies</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#FFFFFF;
+    --bg-alt:#FAFAFA;
+    --ink:#0E0D0E;           /* near-black, for the bold display type */
+    --ink-2:#5F595C;
+    --ink-3:#9A9498;
+    --line:#EDEBEA;
+    --line-2:#E2DEDD;
+    --rose:#D96B87;
+    --rose-deep:#C1546F;
+    --rose-wash:#FCF1F4;
+    --rose-line:#F3DBE1;
+    --good:#4F8A6B;
+    --amber:#C99447;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:'Inter',sans-serif;background:var(--bg);color:var(--ink);
+    font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;
+    font-feature-settings:"cv02","cv03","cv04","cv11";
+  }
+  ::selection{background:var(--rose-wash);color:var(--rose-deep)}
+  .mono{font-family:'JetBrains Mono',monospace}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 clamp(22px,5vw,40px)}
+  a{color:inherit;text-decoration:none}
+  .pill{border-radius:999px}
+
+  /* ---------- nav ---------- */
+  nav{border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(255,255,255,.88);
+    backdrop-filter:blur(10px);z-index:50}
+  .nav-inner{display:flex;justify-content:space-between;align-items:center;height:68px;
+    max-width:1120px;margin:0 auto;padding:0 clamp(22px,5vw,40px)}
+  .logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:20px;letter-spacing:-.03em}
+  .logo .mark{width:22px;height:22px;background:var(--rose);border-radius:6px 6px 6px 2px;position:relative}
+  .logo .mark::after{content:'';position:absolute;width:8px;height:8px;background:var(--rose);border-radius:3px 3px 3px 1px;bottom:-4px;right:-4px}
+  .logo b{color:var(--rose)}
+  .nav-mid{display:flex;gap:30px;align-items:center;font-size:15px;color:var(--ink-2);font-weight:500}
+  .nav-mid a:hover{color:var(--ink)}
+  .nav-cta{font-size:15px;font-weight:600;color:#fff;background:var(--rose);
+    padding:10px 22px;border-radius:999px;transition:.15s}
+  .nav-cta:hover{background:var(--rose-deep)}
+
+  /* ---------- hero — big, bold, centered (Inquisia DNA) ---------- */
+  .hero{padding:clamp(72px,11vw,128px) 0 clamp(48px,7vw,80px);text-align:center}
+  .hero-tag{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:500;
+    color:var(--rose-deep);background:var(--rose-wash);border:1px solid var(--rose-line);
+    padding:7px 16px;border-radius:999px;margin-bottom:30px}
+  .hero-tag .dot{width:6px;height:6px;border-radius:50%;background:var(--rose)}
+  h1{font-size:clamp(44px,8vw,92px);font-weight:800;letter-spacing:-.045em;
+    line-height:.98;margin:0 auto 26px;max-width:15ch}
+  h1 .rose{color:var(--rose-deep)}
+  .hero-sub{font-size:clamp(17px,2.1vw,20px);color:var(--ink-2);max-width:56ch;margin:0 auto 36px;line-height:1.5}
+
+  /* the search bar IS the product front door (Inquisia's centerpiece move) */
+  .search-shell{max-width:660px;margin:0 auto}
+  .search-bar{display:flex;align-items:center;gap:12px;background:var(--bg);
+    border:1.5px solid var(--line-2);border-radius:999px;padding:8px 8px 8px 22px;
+    box-shadow:0 1px 2px rgba(14,13,14,.03),0 14px 40px rgba(14,13,14,.06);transition:.2s}
+  .search-bar:focus-within{border-color:var(--rose);box-shadow:0 1px 2px rgba(14,13,14,.03),0 14px 44px rgba(217,107,135,.18)}
+  .search-bar .sicon{color:var(--ink-3);font-size:18px;flex-shrink:0}
+  .search-bar input{flex:1;border:none;outline:none;font-family:'Inter';font-size:16px;color:var(--ink);background:transparent;padding:12px 0}
+  .search-bar input::placeholder{color:var(--ink-3)}
+  .search-go{font-family:'Inter';font-size:15px;font-weight:600;color:#fff;background:var(--rose);
+    border:none;padding:13px 28px;border-radius:999px;cursor:pointer;transition:.15s;flex-shrink:0}
+  .search-go:hover{background:var(--rose-deep)}
+  .search-chips{display:flex;gap:10px;justify-content:center;margin-top:16px;flex-wrap:wrap}
+  .chip{font-size:14px;color:var(--ink-2);background:var(--bg);border:1px solid var(--line-2);
+    padding:8px 18px;border-radius:999px;cursor:pointer;transition:.15s;font-weight:500}
+  .chip:hover{border-color:var(--rose);color:var(--rose-deep);background:var(--rose-wash)}
+  .hero-note{font-size:13.5px;color:var(--ink-3);margin-top:26px}
+
+  /* ---------- sample output panel ---------- */
+  .output{padding:0 0 clamp(48px,7vw,80px)}
+  .panel{max-width:820px;margin:0 auto;border:1px solid var(--line-2);border-radius:20px;
+    overflow:hidden;box-shadow:0 1px 2px rgba(14,13,14,.03),0 24px 60px rgba(14,13,14,.08)}
+  .panel-bar{display:flex;align-items:center;gap:8px;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--bg-alt)}
+  .panel-bar .dots{display:flex;gap:6px}
+  .panel-bar .dots i{width:10px;height:10px;border-radius:50%;background:var(--line-2);display:block}
+  .panel-bar .path{font-family:'JetBrains Mono';font-size:12px;color:var(--ink-3);margin-left:8px}
+  .panel-bar .live{margin-left:auto;font-family:'JetBrains Mono';font-size:11px;color:var(--rose-deep);display:flex;align-items:center;gap:6px}
+  .panel-bar .live .pulse{width:6px;height:6px;border-radius:50%;background:var(--rose)}
+  .panel-body{padding:clamp(18px,3vw,28px)}
+  .panel-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px}
+  .panel-head .ph-t{font-weight:600;font-size:15px}
+  .panel-head .ph-s{font-family:'JetBrains Mono';font-size:12px;color:var(--ink-3)}
+  .rows{display:flex;flex-direction:column}
+  .row{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;padding:17px 4px;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:none}
+  .row-name{font-weight:600;font-size:15.5px}
+  .row-meta{display:flex;gap:18px;margin-top:7px;flex-wrap:wrap}
+  .rm{font-family:'JetBrains Mono';font-size:12.5px;color:var(--ink-2)}
+  .rm b{font-weight:500}.rm .bad{color:var(--rose-deep)}.rm .ok{color:var(--good)}
+  .row-score{display:flex;align-items:center;gap:12px}
+  .score-bar{width:72px;height:6px;border-radius:999px;background:var(--line);overflow:hidden}
+  .score-bar i{display:block;height:100%;border-radius:999px}
+  .score-num{font-weight:700;font-size:21px;min-width:34px;text-align:right;letter-spacing:-.02em}
+
+  /* ---------- facts ---------- */
+  .facts{padding:clamp(56px,8vw,88px) 0;background:var(--bg-alt);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .facts h2,.section-h{text-align:center}
+  .section-tag{font-family:'JetBrains Mono';font-size:12px;color:var(--rose-deep);letter-spacing:.08em;
+    text-transform:uppercase;margin-bottom:14px;text-align:center}
+  h2{font-size:clamp(30px,5vw,52px);font-weight:800;letter-spacing:-.035em;line-height:1.02}
+  .facts-sub{text-align:center;color:var(--ink-2);max-width:52ch;margin:14px auto 48px;font-size:17px}
+  .facts-row{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;max-width:900px;margin:0 auto}
+  .fcard{background:var(--bg);border:1px solid var(--line-2);border-radius:16px;padding:26px 22px;text-align:center}
+  .fcard .fn{font-size:clamp(30px,4vw,42px);font-weight:800;letter-spacing:-.03em;color:var(--rose-deep);line-height:1}
+  .fcard .ft{font-size:13.5px;color:var(--ink-2);margin-top:12px;line-height:1.45}
+
+  /* ---------- how ---------- */
+  .how{padding:clamp(56px,8vw,96px) 0;text-align:center}
+  .how h2{margin-bottom:14px}
+  .how-sub{color:var(--ink-2);max-width:50ch;margin:0 auto 52px;font-size:17px}
+  .how-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;text-align:left}
+  .hs{background:var(--bg);border:1px solid var(--line-2);border-radius:18px;padding:30px 28px;transition:.2s}
+  .hs:hover{border-color:var(--rose);box-shadow:0 12px 30px rgba(217,107,135,.1);transform:translateY(-3px)}
+  .hs-n{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;
+    border-radius:999px;background:var(--rose-wash);color:var(--rose-deep);font-family:'JetBrains Mono';
+    font-weight:500;font-size:14px;margin-bottom:20px}
+  .hs h3{font-size:19px;font-weight:700;letter-spacing:-.02em;margin-bottom:10px}
+  .hs p{font-size:14.5px;color:var(--ink-2);line-height:1.55}
+
+  /* ---------- who ---------- */
+  .who{padding:clamp(56px,8vw,96px) 0;background:var(--bg-alt);border-top:1px solid var(--line)}
+  .who-inner{max-width:720px;margin:0 auto;text-align:center}
+  .who h2{margin-bottom:16px}
+  .who-p{color:var(--ink-2);font-size:17px;margin:0 auto 12px;max-width:48ch}
+  .who-tag{font-family:'JetBrains Mono';font-size:13px;color:var(--rose-deep);margin-top:10px;margin-bottom:44px}
+  .who-list{display:grid;grid-template-columns:1fr 1fr;gap:16px;text-align:left}
+  .wl{background:var(--bg);border:1px solid var(--line-2);border-radius:14px;padding:22px 24px;display:flex;gap:14px;align-items:flex-start}
+  .wl .n{font-family:'JetBrains Mono';font-size:13px;color:var(--rose);flex-shrink:0;font-weight:500}
+  .wl span:last-child{font-size:14.5px;line-height:1.5;color:var(--ink)}
+
+  /* ---------- cta ---------- */
+  .cta{padding:clamp(64px,9vw,110px) 0;text-align:center}
+  .cta h2{margin-bottom:16px;max-width:16ch;margin-left:auto;margin-right:auto}
+  .cta p{color:var(--ink-2);font-size:18px;max-width:44ch;margin:0 auto 34px}
+  .cta-form{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;max-width:480px;margin:0 auto}
+  .cta-form input{flex:1;min-width:220px;font-family:'Inter';font-size:16px;padding:14px 22px;
+    border:1.5px solid var(--line-2);border-radius:999px;background:var(--bg);color:var(--ink)}
+  .cta-form input:focus{outline:none;border-color:var(--rose)}
+  .cta-form button{font-family:'Inter';font-size:16px;font-weight:600;color:#fff;background:var(--rose);
+    border:none;padding:14px 30px;border-radius:999px;cursor:pointer;transition:.15s}
+  .cta-form button:hover{background:var(--rose-deep)}
+  .cta-note{font-size:13.5px;color:var(--ink-3);margin-top:16px}
+
+  footer{border-top:1px solid var(--line);padding:40px 0}
+  .foot-inner{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px}
+  .foot-inner .fnote{font-size:13.5px;color:var(--ink-3)}
+
+  @media(max-width:820px){
+    .facts-row{grid-template-columns:1fr 1fr}
+    .how-steps{grid-template-columns:1fr}
+    .who-list{grid-template-columns:1fr}
+    .nav-mid{display:none}
+    .row{grid-template-columns:1fr;gap:12px}
+    .search-bar{flex-wrap:wrap;border-radius:24px;padding:14px 18px}
+    .search-bar input{width:100%}
+    .search-go{width:100%}
+  }
+  @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <div class="logo"><span class="mark"></span>foundry<b>.</b></div>
+    <div class="nav-mid">
+      <a href="#how">How it works</a>
+      <a href="#output">Sample scan</a>
+      <a href="#who">Who it's for</a>
+    </div>
+    <a href="#cta" class="nav-cta">Get started</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="wrap">
+    <h1>Find who's <span class="rose">losing customers</span> online.</h1>
+    <p class="hero-sub">Foundry scans local businesses, measures exactly where their digital presence is leaking revenue, and scores each one as a lead. Walk into the pitch already holding the proof.</p>
+
+    <div class="search-shell">
+      <div class="search-bar">
+        <span class="sicon">⌕</span>
+        <input type="text" id="heroSearch" placeholder="Try  “med spa · Austin”  or  “plumber · Miami”">
+        <button class="search-go" onclick="document.getElementById('output').scrollIntoView()">Scan</button>
+      </div>
+      <div class="search-chips">
+        <span class="chip" onclick="fillSearch('Med spa · Austin')">Med spa · Austin</span>
+        <span class="chip" onclick="fillSearch('Plumber · Miami')">Plumber · Miami</span>
+        <span class="chip" onclick="fillSearch('Dentist · Denver')">Dentist · Denver</span>
+        <span class="chip" onclick="fillSearch('HVAC · Phoenix')">HVAC · Phoenix</span>
+      </div>
+      <div class="hero-note">Starting with med spas and home services. One niche at a time.</div>
+    </div>
+  </div>
+</header>
+
+<!-- SAMPLE OUTPUT -->
+<section class="output" id="output">
+  <div class="wrap">
+    <div class="panel">
+      <div class="panel-bar">
+        <div class="dots"><i></i><i></i><i></i></div>
+        <span class="path">foundry / scan / plumbing · florida</span>
+        <span class="live"><span class="pulse"></span>4 scanned</span>
+      </div>
+      <div class="panel-body">
+        <div class="panel-head">
+          <span class="ph-t">Ranked by opportunity</span>
+          <span class="ph-s">higher = bigger, fixable problem</span>
+        </div>
+        <div class="rows" id="rows"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FACTS -->
+<section class="facts">
+  <div class="wrap">
+    <div class="section-tag">Why it works</div>
+    <h2>Weak presence is lost revenue.</h2>
+    <p class="facts-sub">A slow site or a thin review page isn't a small flaw — for a local business, it's customers leaving before they ever call.</p>
+    <div class="facts-row">
+      <div class="fcard"><div class="fn">53%</div><div class="ft">leave a site that takes over three seconds to load</div></div>
+      <div class="fcard"><div class="fn">47%</div><div class="ft">won't consider a business under 20 reviews</div></div>
+      <div class="fcard"><div class="fn">97%</div><div class="ft">read reviews before choosing a local business</div></div>
+      <div class="fcard"><div class="fn">~60%</div><div class="ft">of local search traffic happens on mobile</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW -->
+<section class="how" id="how">
+  <div class="wrap">
+    <div class="section-tag">How it works</div>
+    <h2>City name to pitch-ready lead.</h2>
+    <p class="how-sub">Foundry does the prospecting research an agency would spend hours on per business — automatically, at the scale of a whole city.</p>
+    <div class="how-steps">
+      <div class="hs">
+        <div class="hs-n">01</div>
+        <h3>Scan a niche and city</h3>
+        <p>Pick a vertical and a location. Foundry pulls the local businesses and their public digital footprint in one pass.</p>
+      </div>
+      <div class="hs">
+        <div class="hs-n">02</div>
+        <h3>Measure what's broken</h3>
+        <p>Site speed, mobile health, review standing against competitors, booking friction, dormant social. Numbers, not impressions.</p>
+      </div>
+      <div class="hs">
+        <div class="hs-n">03</div>
+        <h3>Read the score</h3>
+        <p>Each business gets a transparent opportunity score and a plain-English audit you can put straight in front of them.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHO -->
+<section class="who" id="who">
+  <div class="wrap">
+    <div class="who-inner">
+      <div class="section-tag">Who it's for</div>
+      <h2>Agencies that live on new business.</h2>
+      <p class="who-p">If you run local lead-gen, your hardest hours go into finding prospects actually worth pitching. Foundry hands you a list where the problem is already measured.</p>
+      <p class="who-tag">Marketing agencies · freelancers · local service specialists</p>
+      <div class="who-list">
+        <div class="wl"><span class="n">01</span><span>Walk into pitches holding the evidence of what's costing them customers, before you've said a word.</span></div>
+        <div class="wl"><span class="n">02</span><span>Skip the businesses that don't need you. The score filters the noise so you spend time where it converts.</span></div>
+        <div class="wl"><span class="n">03</span><span>Every audit is a conversation starter grounded in real numbers, not a cold template.</span></div>
+        <div class="wl"><span class="n">04</span><span>Start focused on one niche, expand into more as the model proves out.</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta" id="cta">
+  <div class="wrap">
+    <div class="section-tag">Early access</div>
+    <h2>Get the leads first.</h2>
+    <p>Foundry is opening to a small first group of agencies. Join early and help shape what gets built.</p>
+    <div class="cta-form">
+      <input type="email" id="email" placeholder="you@agency.com">
+      <button onclick="joinWaitlist()">Request access</button>
+    </div>
+    <div class="cta-note" id="formNote">No spam. We'll reach out when your niche opens.</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-inner">
+    <div class="logo"><span class="mark"></span>foundry<b>.</b></div>
+    <div class="fnote">Local lead intelligence · built for agencies</div>
+  </div>
+</footer>
+
+<script>
+  const AUDITS=[
+    {name:'The Goat Plumbing',speed:36,load:'24.2s',booking:'None',score:78},
+    {name:'Plumbers of South Florida',speed:58,load:'20.5s',booking:'None',score:64},
+    {name:'Modern Plumbing Industries',speed:47,load:'11.8s',booking:'None',score:56},
+    {name:'Emerald Plumbing',speed:62,load:'8.4s',booking:'Maybe',score:41},
+  ];
+  const scoreColor=s=>s>=70?'var(--rose-deep)':s>=45?'var(--amber)':'var(--good)';
+  document.getElementById('rows').innerHTML=AUDITS.map(a=>`
+    <div class="row">
+      <div>
+        <div class="row-name">${a.name}</div>
+        <div class="row-meta">
+          <span class="rm">speed <b class="${a.speed<50?'bad':'ok'}">${a.speed}/100</b></span>
+          <span class="rm">load <b class="bad">${a.load}</b></span>
+          <span class="rm">booking <b class="${a.booking==='None'?'bad':''}">${a.booking}</b></span>
+        </div>
+      </div>
+      <div class="row-score">
+        <div class="score-bar"><i style="width:${a.score}%;background:${scoreColor(a.score)}"></i></div>
+        <div class="score-num" style="color:${scoreColor(a.score)}">${a.score}</div>
+      </div>
+    </div>`).join('');
+
+  function fillSearch(v){document.getElementById('heroSearch').value=v;document.getElementById('heroSearch').focus();}
+  function joinWaitlist(){
+    const e=document.getElementById('email').value.trim(),note=document.getElementById('formNote');
+    if(!e||!e.includes('@')){note.textContent='Enter a valid email and we\'ll be in touch.';note.style.color='var(--rose-deep)';return;}
+    note.textContent='You\'re on the list. We\'ll reach out when your niche opens.';note.style.color='var(--good)';
+    document.getElementById('email').value='';
+  }
+</script>
+</body>
+</html>
