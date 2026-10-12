@@ -40,8 +40,8 @@ Open `http://localhost:3000`. No keys are required to explore `/dashboard` with 
 
 Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). `.env.example` contains every required variable. Secrets belong in `.env.local` locally and in the hosting provider's environment settings in production. Never commit them or paste them into a chat.
 
-1. Create or select a Supabase project and apply `supabase/migrations/001_foundry.sql` once.
-2. Set the Supabase public URL, public anon key and server-only service-role key.
+1. Create or select a Supabase project and apply every SQL file in `supabase/migrations/` once, in filename order. The later migrations restrict Supabase's default function grants.
+2. Set the Supabase public URL, publishable key and server-only secret key. The existing `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` variable names also accept the modern publishable and secret keys.
 3. Enable Google Places API (New) and PageSpeed Insights API; set their server-side keys.
 4. Optionally enable Claude outreach and Stripe subscriptions.
 5. Import the repository into Vercel, using the repository root and the Next.js framework.

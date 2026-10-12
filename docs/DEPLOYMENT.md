@@ -5,9 +5,9 @@ Status: the code builds and tests without secrets. A live deployment needs acces
 ## 1. Supabase
 
 1. Select or create the intended project in Supabase.
-2. Run `supabase/migrations/001_foundry.sql` once using the SQL editor or your migration workflow. The migration is transactional; do not re-run it after success.
-3. Copy the project URL and anon key into `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-4. Put the service-role key in `SUPABASE_SERVICE_ROLE_KEY`, **server-only**. It is needed to save server-generated evidence and apply billing updates. Authenticated clients can update only their own stages/notes, never the evidence payload, plan or quota counters.
+2. Apply every SQL file in `supabase/migrations/` once, in filename order, using the SQL editor or your migration workflow. Do not re-run a successful migration. The follow-up migrations remove direct default grants from API roles and isolate privileged account functions in a private schema.
+3. Copy the project URL and modern publishable key into `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the variable retains its legacy name for compatibility).
+4. Put a Supabase secret key (or legacy service-role key) in `SUPABASE_SERVICE_ROLE_KEY`, **server-only**, as a Vercel Secret for Production. It is needed to save server-generated evidence and apply billing updates. Authenticated clients can update only their own stages/notes, never the evidence payload, plan or quota counters.
 5. Enable email/password auth and email confirmation. Configure an email sender suitable for production in Supabase.
 6. Set the Auth Site URL to the final production origin. Add exact allowed redirects for `/dashboard` and `/login?reset=1`; use separate preview URLs for any staging deployment.
 

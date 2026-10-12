@@ -1,5 +1,5 @@
 import { PGlite } from "@electric-sql/pglite";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 import assert from "node:assert/strict";
 const userA = "11111111-1111-4111-8111-111111111111",
@@ -9,12 +9,12 @@ test("database migration enforces ownership, quotas and billing authority", asyn
   await db.exec(
     `create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;insert into auth.users values('${userA}'),('${userB}');`,
   );
-  await db.exec(
-    await readFile(
-      new URL("../supabase/migrations/001_foundry.sql", import.meta.url),
-      "utf8",
-    ),
-  );
+  // Reproduce Supabase's direct default grants, not just vanilla PostgreSQL.
+  await db.exec("alter default privileges in schema public grant execute on functions to anon, authenticated, service_role");
+  const migrations = new URL("../supabase/migrations/", import.meta.url);
+  for (const file of (await readdir(migrations)).filter((f) => f.endsWith(".sql")).sort()) {
+    await db.exec(await readFile(new URL(file, migrations), "utf8"));
+  }
   await db.exec(
     `grant usage on schema public to authenticated,anon,service_role;set role authenticated;set request.jwt.claim.sub='${userA}';`,
   );
