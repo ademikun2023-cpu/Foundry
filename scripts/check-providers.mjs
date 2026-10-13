@@ -13,16 +13,27 @@ for (const name of required) {
   }
 }
 function safeCode(value) {
-  return typeof value === 'string' && /^[A-Z][A-Z0-9_]{0,100}$/.test(value) ? value : undefined;
+  return typeof value === 'string' && /^[A-Za-z][A-Za-z0-9_]{0,100}$/.test(value) ? value : undefined;
 }
 async function check(name, url, options, validate) {
+  if (process.argv.includes('--places-only') && name !== 'places') return true;
   try {
     const res = await fetch(url, { ...options, signal: AbortSignal.timeout(55000) });
     const data = await res.json().catch(() => null);
     const result = { provider: name, http: res.status, ok: res.ok && validate(data) };
     if (!res.ok) {
       result.status = safeCode(data?.error?.status);
-      result.reasons = (data?.error?.details ?? []).map(d => safeCode(d.reason)).filter(Boolean);
+      result.reasons = [...(data?.error?.details ?? []), ...(data?.error?.errors ?? [])].map(d => safeCode(d.reason)).filter(Boolean);
+      const message = typeof data?.error?.message === 'string' ? data.error.message : '';
+      result.hints = [
+        ['BILLING', /billing/i],
+        ['API_NOT_ENABLED', /not enabled|disabled|has not been used|enable.*API/i],
+        ['REFERRER_RESTRICTION', /referer|referrer/i],
+        ['IP_RESTRICTION', /IP address/i],
+        ['API_RESTRICTION', /blocked|not authorized.*API|not allowed.*API/i],
+        ['INVALID_KEY', /API key.*not valid|invalid.*API key/i],
+        ['QUOTA', /quota|rate limit/i],
+      ].filter(([, pattern]) => pattern.test(message)).map(([code]) => code);
     }
     console.log('FOUNDRY_PROVIDER_CHECK ' + JSON.stringify(result));
     return result.ok;
