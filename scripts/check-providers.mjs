@@ -1,6 +1,6 @@
 // Explicit deployment check. Never runs during normal builds or tests.
 // Uses existing server environment values; prints no keys, URLs with keys,
-// provider error messages, business records, or database rows.
+// unredacted provider error messages, business records, or database rows.
 if (!process.argv.includes('--live')) {
   console.error('Use --live to authorize one request per configured provider.');
   process.exit(1);
@@ -15,6 +15,16 @@ for (const name of required) {
 function safeCode(value) {
   return typeof value === 'string' && /^[A-Za-z][A-Za-z0-9_]{0,100}$/.test(value) ? value : undefined;
 }
+function safeMessage(message) {
+  for (const value of Object.values(process.env)) {
+    if (value && value.length >= 6) {
+      message = message.split(value).join('[REDACTED]');
+      message = message.split(encodeURIComponent(value)).join('[REDACTED]');
+    }
+  }
+  return message.replace(/https?:\/\/\S+/g, '[URL]')
+    .replace(/[A-Za-z0-9_\-]{25,}/g, '[REDACTED]').slice(0, 500);
+}
 async function check(name, url, options, validate) {
   if (process.argv.includes('--places-only') && name !== 'places') return true;
   try {
@@ -25,6 +35,7 @@ async function check(name, url, options, validate) {
       result.status = safeCode(data?.error?.status);
       result.reasons = [...(data?.error?.details ?? []), ...(data?.error?.errors ?? [])].map(d => safeCode(d.reason)).filter(Boolean);
       const message = typeof data?.error?.message === 'string' ? data.error.message : '';
+      if (process.argv.includes('--diagnose')) result.message = safeMessage(message);
       result.hints = [
         ['BILLING', /billing/i],
         ['API_NOT_ENABLED', /not enabled|disabled|has not been used|enable.*API/i],
