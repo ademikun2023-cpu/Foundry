@@ -756,46 +756,6 @@
 .landing-page .landing-menu a:hover {
   background: var(--rose-wash);
 }
-.landing-page .landing-pricing {
-  padding: 80px 0;
-  border-top: 1px solid var(--line);
-  background: #fffafb;
-  scroll-margin-top: 70px;
-}
-.landing-page .landing-pricing h2 {
-  text-align: center;
-  font-size: clamp(30px, 4vw, 46px);
-  letter-spacing: -1.5px;
-  line-height: 1.1;
-  margin: 12px 0 16px;
-}
-.landing-page .pricing-intro {
-  text-align: center;
-  color: var(--ink-2);
-}
-.landing-page .plans {
-  text-align: left;
-}
-.landing-page .plan h3 {
-  font-size: 38px;
-  line-height: 1.2;
-}
-.landing-page .plan h3 small {
-  font-size: 13px;
-}
-.landing-page .plan ul {
-  padding: 0;
-  margin: 24px 0;
-}
-.landing-page .plan > p {
-  font-size: 13px;
-}
-.landing-page .plan li {
-  font-size: 12px;
-}
-.landing-page .plan .btn {
-  border-radius: 9px;
-}
 .landing-page .hero {
   animation: enter-soft 0.45s ease-out;
 }
@@ -925,9 +885,6 @@
     width: 100%;
     min-width: 0;
     padding: 14px 18px;
-  }
-  .landing-page .landing-pricing {
-    padding: 56px 0;
   }
   .landing-page .foot-inner {
     align-items: flex-start;

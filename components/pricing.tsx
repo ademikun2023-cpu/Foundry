@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import {
   PLANS,
@@ -125,25 +124,5 @@ export function PricingCards({
         discovery is temporarily paused.
       </p>
     </>
-  );
-}
-
-export default function LandingPricing() {
-  const [interval, setInterval] = useState<BillingInterval>("monthly");
-  return (
-    <section id="pricing" className="landing-pricing">
-      <div className="wrap">
-        <div className="section-tag">Simple, transparent pricing</div>
-        <h2>Find your next stage of growth.</h2>
-        <p className="pricing-intro">
-          Choose your pace. Every plan starts with evidence.
-        </p>
-        <PricingCards interval={interval} onInterval={setInterval} />
-        <p className="pricing-status">
-          Explore the free sample workspace today. Paid subscriptions open when
-          checkout is ready.
-        </p>
-      </div>
-    </section>
   );
 }
