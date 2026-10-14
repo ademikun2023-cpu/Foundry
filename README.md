@@ -32,7 +32,7 @@ Open `http://localhost:3000`. No keys are required to explore `/dashboard` with 
 - Saved reports, pipeline stages, private notes, deletion, search, filtering and CSV export.
 - Downloadable standalone HTML reports and browser print / save-as-PDF.
 - Evidence-based email and follow-up drafts; optional Claude generation, with a template fallback.
-- Stripe Checkout, customer portal and signature-verified, idempotent subscription webhooks.
+- Paystack hosted checkout, subscription management and signature-verified payment webhooks (disabled until provider setup and live acceptance checks).
 - Server-enforced monthly allowances and per-action burst limits.
 - Automated CI, security-focused tests, and a deployable production build.
 
@@ -43,7 +43,7 @@ Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). `.env.example` contains every r
 1. Create or select a Supabase project and apply every SQL file in `supabase/migrations/` once, in filename order. The later migrations restrict Supabase's default function grants.
 2. Set the Supabase public URL, publishable key and server-only secret key. The existing `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` variable names also accept the modern publishable and secret keys.
 3. Enable Google Places API (New) and PageSpeed Insights API; set their server-side keys.
-4. Optionally enable Claude outreach and Stripe subscriptions.
+4. Optionally enable Claude outreach and configure Paystack subscriptions using [docs/PAYMENTS.md](docs/PAYMENTS.md).
 5. Import the repository into Vercel, using the repository root and the Next.js framework.
 
 The provider calls and deployment cannot be live-tested until those accounts and values are connected. Nothing in this repository creates paid provider accounts or purchases a plan.
@@ -80,7 +80,7 @@ npm run check
 npm audit --omit=dev
 ```
 
-`check` runs TypeScript, 28 tests, and a production build. Database tests execute the migration in embedded PostgreSQL (PGlite), including real role and RLS checks. The integration test simulates Google, Supabase HTTP responses and provider persistence; it does not claim a live provider run. A real-browser walkthrough and live account/payment checks remain required before a paid launch.
+`check` runs TypeScript, automated tests, and a production build. Database tests execute the migration in embedded PostgreSQL (PGlite), including real role and RLS checks. The integration test simulates Google, Supabase HTTP responses and provider persistence; it does not claim a live provider run. A real-browser walkthrough and live account/payment checks remain required before a paid launch.
 
 ## Current scope and limits
 
@@ -88,7 +88,7 @@ npm audit --omit=dev
 - The UI currently loads the 500 most recent saved audits. Add cursor pagination before large-volume agency use.
 - Batches run in the open browser tab. Closing the tab can interrupt remaining work; a durable background job queue is future work.
 - Searches and attempted audit/draft calls consume quota even when an upstream provider fails. Per-action bursts are limited to five calls per minute.
-- Allowances reset by UTC calendar month, independently of Stripe's billing anniversary. Plan limits are editable in the migration; Stripe prices are configured in the Stripe dashboard, not hardcoded.
+- Allowances reset by UTC calendar month, independently of the subscription anniversary. USD prices are defined in `lib/plans.ts` and checked against Paystack plans before checkout; the database independently enforces the same amounts.
 - Agency/report name is session-local. Private prospect notes are persisted; notes and outreach are excluded from client report exports.
 - No email or DM is sent automatically. Review generated drafts and factual claims before sending.
 - Google Analytics, Search Console, Meta Ads, recurring client reports and social activity monitoring are not included.
@@ -100,4 +100,4 @@ npm audit --omit=dev
 - [Supabase Auth getUser](https://supabase.com/docs/reference/javascript/auth-getuser)
 - [Google Places Text Search](https://developers.google.com/maps/documentation/places/web-service/text-search)
 - [PageSpeed Insights API](https://developers.google.com/speed/docs/insights/v5/get-started)
-- [Stripe subscription webhooks](https://docs.stripe.com/billing/subscriptions/webhooks)
+- [Paystack subscriptions](https://paystack.com/docs/payments/subscriptions/)

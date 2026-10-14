@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import {
@@ -38,6 +38,8 @@ import type {
 import { STAGES } from "@/lib/types";
 import Brand from "./brand";
 import Report from "./report";
+import { PricingCards } from "./pricing";
+import type { BillingInterval, PaidPlan } from "@/lib/plans";
 
 type View = "discover" | "prospects" | "pipeline" | "settings";
 const emptyConfig: AppConfig = {
@@ -74,8 +76,76 @@ export default function Workspace() {
     [businessName, setBusinessName] = useState(""),
     [agency, setAgency] = useState("Your agency"),
     [mobile, setMobile] = useState(false);
+  const [billingInterval, setBillingInterval] = useState<BillingInterval>(
+    params.get("interval") === "yearly" ? "yearly" : "monthly",
+  );
+  const navigationRef = useRef<HTMLElement>(null);
+  const paymentReference = params.get("reference") || params.get("trxref");
+  useEffect(() => {
+    if (!mobile) return;
+    const before = document.body.style.overflow;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = "hidden";
+    const focusables = () =>
+      Array.from(
+        navigationRef.current?.querySelectorAll<HTMLElement>(
+          "a[href],button:not([disabled]),input,select",
+        ) || [],
+      ).filter((el) => el.getClientRects().length > 0);
+    focusables()[0]?.focus();
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobile(false);
+      if (event.key === "Tab") {
+        const items = focusables(),
+          first = items[0],
+          last = items.at(-1);
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", close);
+    const desktop = matchMedia("(min-width: 851px)");
+    const resize = () => {
+      if (desktop.matches) setMobile(false);
+    };
+    desktop.addEventListener("change", resize);
+    return () => {
+      document.body.style.overflow = before;
+      document.removeEventListener("keydown", close);
+      desktop.removeEventListener("change", resize);
+      previousFocus?.focus();
+    };
+  }, [mobile]);
   const demo = !session;
   const selectedAudit = audits.find((a) => a.id === selected);
+  useEffect(() => {
+    if (!session || !paymentReference || params.get("checkout") !== "return")
+      return;
+    let active = true;
+    setNotice("Checking your payment with Paystack…");
+    api("/api/billing", { action: "verify", reference: paymentReference })
+      .then(() => api<Account>("/api/account"))
+      .then((value) => {
+        if (active) {
+          setAccount(value);
+          setNotice("Payment verified. Your subscription is ready.");
+        }
+      })
+      .catch((error) => {
+        if (active) {
+          setNotice("");
+          setError(error.message);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [session?.user.id, paymentReference, params]);
   useEffect(() => {
     const q = params.get("q");
     if (q) {
@@ -254,11 +324,12 @@ export default function Workspace() {
     await refreshAccount();
     return outreach;
   }
-  async function billing(action: "checkout" | "portal", plan?: string) {
+  async function billing(action: "checkout" | "portal", plan?: PaidPlan) {
     await perform("billing", async () => {
       const result = await api<{ url: string }>("/api/billing", {
         action,
         plan,
+        interval: billingInterval,
       });
       if (result.url) location.assign(result.url);
     });
@@ -326,7 +397,21 @@ export default function Workspace() {
       <a className="skip-link" href="#main">
         Skip to content
       </a>
-      <aside className={`sidebar ${mobile ? "is-open" : ""}`}>
+      {mobile && (
+        <button
+          className="nav-backdrop"
+          aria-label="Close navigation overlay"
+          onClick={() => setMobile(false)}
+        />
+      )}
+      <aside
+        ref={navigationRef}
+        id="workspace-navigation"
+        role={mobile ? "dialog" : undefined}
+        aria-modal={mobile ? true : undefined}
+        aria-label="Workspace navigation"
+        className={`sidebar ${mobile ? "is-open" : ""}`}
+      >
         <div className="sidebar-brand">
           <Brand />
           <button
@@ -370,7 +455,7 @@ export default function Workspace() {
             </p>
             <button
               onClick={() => {
-                setView("discover");
+                nav("discover");
                 setDirect(true);
               }}
             >
@@ -411,12 +496,14 @@ export default function Workspace() {
           </div>
         </div>
       </aside>
-      <div className="workspace-main">
+      <div className="workspace-main" inert={mobile ? true : undefined}>
         <header className="topbar">
           <div className="breadcrumb">
             <button
               className="icon-btn mobile-only"
               aria-label="Open navigation"
+              aria-expanded={mobile}
+              aria-controls="workspace-navigation"
               onClick={() => setMobile(true)}
             >
               <Menu size={20} />
@@ -534,7 +621,10 @@ export default function Workspace() {
                           />
                         </div>
                       </label>
-                      <button className="btn primary" disabled={Boolean(busy)}>
+                      <button
+                        className="btn primary"
+                        disabled={Boolean(busy) || !config.search}
+                      >
                         {busy === "search" ? (
                           <LoaderCircle className="spin" size={16} />
                         ) : (
@@ -543,6 +633,19 @@ export default function Workspace() {
                         Find businesses
                       </button>
                     </form>
+                    {!config.search && (
+                      <p className="discovery-paused">
+                        Business discovery is temporarily paused.{" "}
+                        <button
+                          type="button"
+                          className="text-link"
+                          onClick={() => setDirect(true)}
+                        >
+                          Audit a website directly
+                        </button>{" "}
+                        or explore the sample reports below.
+                      </p>
+                    )}
                     <div className="suggestions">
                       <span>Try a market</span>
                       {[
@@ -1026,77 +1129,36 @@ export default function Workspace() {
                       </div>
                       <button
                         className="btn"
-                        disabled={demo || !config.billing || Boolean(busy)}
+                        disabled={
+                          demo ||
+                          (!config.billing && !account?.hasSubscription) ||
+                          Boolean(busy)
+                        }
                         onClick={() => billing("portal")}
                       >
                         Manage billing <ArrowUpRight size={14} />
                       </button>
                     </div>
-                    <div className="plans">
-                      {[
-                        {
-                          key: "starter",
-                          name: "Starter",
-                          limit: "100",
-                          desc: "Build a focused prospecting habit.",
-                        },
-                        {
-                          key: "growth",
-                          name: "Growth",
-                          limit: "500",
-                          desc: "Research more markets, consistently.",
-                        },
-                        {
-                          key: "agency",
-                          name: "Agency",
-                          limit: "2,000",
-                          desc: "Room for a busy agency pipeline.",
-                        },
-                      ].map((p) => (
-                        <article
-                          className={`plan ${p.key === "growth" ? "featured" : ""}`}
-                          key={p.key}
-                        >
-                          <span className="eyebrow">{p.name}</span>
-                          <h3>
-                            {p.limit}
-                            <small> audits / month</small>
-                          </h3>
-                          <p>{p.desc}</p>
-                          <ul>
-                            <li>
-                              <Check size={14} />
-                              {p.limit} business searches
-                            </li>
-                            <li>
-                              <Check size={14} />
-                              Saved reports and CSV export
-                            </li>
-                            <li>
-                              <Check size={14} />
-                              Evidence-based outreach drafts
-                            </li>
-                          </ul>
-                          <button
-                            className="btn full"
-                            disabled={
-                              demo ||
-                              !config.billing ||
-                              Boolean(busy) ||
-                              account?.plan === p.key
-                            }
-                            onClick={() => billing("checkout", p.key)}
-                          >
-                            {account?.plan === p.key
-                              ? "Current plan"
-                              : config.billing
-                                ? "View checkout"
-                                : "Coming soon"}
-                            <ArrowRight size={14} />
-                          </button>
-                        </article>
-                      ))}
-                    </div>
+                    {account?.paidUntil && (
+                      <p className="billing-status">
+                        Paid access through{" "}
+                        {new Date(account.paidUntil).toLocaleDateString()}.{" "}
+                        {account.renewalStatus === "non-renewing" ||
+                        account.renewalStatus === "cancelled"
+                          ? "Renewal is cancelled."
+                          : account.hasSubscription
+                            ? "Manage billing to view renewal and payment details."
+                            : "Subscription confirmation is pending."}
+                      </p>
+                    )}
+                    <PricingCards
+                      interval={billingInterval}
+                      onInterval={setBillingInterval}
+                      onChoose={(plan) => billing("checkout", plan)}
+                      currentPlan={account?.plan}
+                      disabled={demo || Boolean(busy)}
+                      available={config.billing}
+                    />
                   </section>
                   {demo && (
                     <button
@@ -1181,7 +1243,7 @@ function AuditTable({
             <th>Business</th>
             <th>Mobile speed</th>
             <th>Booking link</th>
-            <th>Opportunity</th>
+            <th>Score</th>
             <th>Stage</th>
             <th>
               <span className="sr-only">Open audit</span>

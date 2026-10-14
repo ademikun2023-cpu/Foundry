@@ -21,10 +21,10 @@ export async function POST(req: Request) {
         city: z.string().trim().min(2).max(150),
       }),
     );
-    if (!process.env.GOOGLE_PLACES_API_KEY)
+    if (!process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_PLACES_ENABLED !== "true")
       throw new ApiError(
         503,
-        "Google Places is not connected yet. Use a direct website audit.",
+        "Business discovery is temporarily paused. You can still audit a website directly.",
       );
     await quota(db, "search");
     const response = await fetch(

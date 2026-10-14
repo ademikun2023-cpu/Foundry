@@ -78,4 +78,8 @@ export type Account = {
   plan: Plan;
   usage: { action: string; used: number; allowance: number }[];
   subscriptionStatus: string | null;
+  billingInterval?: "monthly" | "yearly" | null;
+  renewalStatus?: string | null;
+  paidUntil?: string | null;
+  hasSubscription?: boolean;
 };

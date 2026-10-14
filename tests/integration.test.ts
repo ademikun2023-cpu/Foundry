@@ -11,6 +11,7 @@ test("search → signed audit → persisted report → outreach with simulated p
     NEXT_PUBLIC_SUPABASE_ANON_KEY: "test-anon",
     SUPABASE_SERVICE_ROLE_KEY: "test-service",
     GOOGLE_PLACES_API_KEY: "test-google",
+    GOOGLE_PLACES_ENABLED: "true",
   };
   Object.assign(process.env, env);
   let saved: Audit | undefined;

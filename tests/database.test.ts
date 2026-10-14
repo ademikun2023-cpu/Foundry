@@ -10,9 +10,13 @@ test("database migration enforces ownership, quotas and billing authority", asyn
     `create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;grant execute on function auth.uid() to authenticated;insert into auth.users values('${userA}'),('${userB}');`,
   );
   // Reproduce Supabase's direct default grants, not just vanilla PostgreSQL.
-  await db.exec("alter default privileges in schema public grant execute on functions to anon, authenticated, service_role");
+  await db.exec(
+    "alter default privileges in schema public grant execute on functions to anon, authenticated, service_role",
+  );
   const migrations = new URL("../supabase/migrations/", import.meta.url);
-  for (const file of (await readdir(migrations)).filter((f) => f.endsWith(".sql")).sort()) {
+  for (const file of (await readdir(migrations))
+    .filter((f) => f.endsWith(".sql"))
+    .sort()) {
     await db.exec(await readFile(new URL(file, migrations), "utf8"));
   }
   await db.exec(
@@ -121,6 +125,100 @@ test("database migration enforces ownership, quotas and billing authority", asyn
     );
     assert.equal(rows[0].account.plan, "free");
   });
+  await t.test(
+    "Paystack checkout reservations serialize, and payments enforce ownership, prices and idempotency",
+    async () => {
+      await db.exec(
+        `reset role;update accounts set stripe_customer_id=null,subscription_status=null,subscription_expires_at=null where user_id='${userA}';set role service_role`,
+      );
+      const reserve = (ref: string) =>
+        db.query<{ result: { reference: string; fresh: boolean } }>(
+          "select reserve_paystack_checkout($1,$2,'PLN_year','starter','yearly','owner@example.com') as result",
+          [userA, ref],
+        );
+      const reserved = await Promise.all([
+        reserve("foundry-one"),
+        reserve("foundry-two"),
+      ]);
+      assert.equal(reserved.filter((r) => r.rows[0].result.fresh).length, 1);
+      assert.equal(
+        reserved[0].rows[0].result.reference,
+        reserved[1].rows[0].result.reference,
+      );
+      const ref = reserved[0].rows[0].result.reference;
+      const pay = (
+        reference: string,
+        amount = 20000,
+        currency = "USD",
+        date = new Date().toISOString(),
+      ) =>
+        db.query(
+          "select apply_paystack_payment($1,$2,'CUS_test','PLN_year','starter','yearly',$3,$4,$5)",
+          [reference, userA, amount, currency, date],
+        );
+      await assert.rejects(pay(ref, 3000));
+      await assert.rejects(pay(ref, 20000, "NGN"));
+      await assert.rejects(
+        db.query(
+          "select apply_paystack_payment($1,$2,'CUS_test','PLN_year','starter','yearly',20000,'USD',now())",
+          [ref, userB],
+        ),
+      );
+      await pay(ref);
+      const before = (
+        await db.query<{ subscription_expires_at: Date }>(
+          "select subscription_expires_at from accounts where user_id=$1",
+          [userA],
+        )
+      ).rows[0];
+      await pay(ref, 20000, "USD", new Date(Date.now() + 60000).toISOString());
+      const after = (
+        await db.query<{ subscription_expires_at: Date }>(
+          "select subscription_expires_at from accounts where user_id=$1",
+          [userA],
+        )
+      ).rows[0];
+      assert.deepEqual(before, after);
+      assert.equal(
+        (await db.query("select * from paystack_payments")).rows.length,
+        1,
+      );
+      await assert.rejects(pay("unknown-renewal"));
+      await db.query(
+        "update accounts set paystack_subscription_code='SUB_test',paystack_status='non-renewing' where user_id=$1",
+        [userA],
+      );
+      await pay(
+        "older-renewal",
+        20000,
+        "USD",
+        new Date(Date.now() - 86400000).toISOString(),
+      );
+      assert.deepEqual(
+        (
+          await db.query(
+            "select subscription_expires_at from accounts where user_id=$1",
+            [userA],
+          )
+        ).rows[0],
+        before,
+      );
+      await db.exec(
+        `set role authenticated;set request.jwt.claim.sub='${userA}'`,
+      );
+      assert.equal(
+        (await db.query<{ a: { plan: string } }>("select get_account() as a"))
+          .rows[0].a.plan,
+        "starter",
+      );
+      await assert.rejects(reserve("fake"));
+      await assert.rejects(pay("fake"));
+      await assert.rejects(db.query("select * from paystack_payments"));
+      await assert.rejects(
+        db.query("update accounts set paystack_customer_code='CUS_other'"),
+      );
+    },
+  );
   await t.test(
     "anonymous callers cannot consume quotas or see audits",
     async () => {
