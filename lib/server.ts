@@ -65,8 +65,9 @@ export function checkOrigin(req: Request) {
 export async function readBody<T>(
   req: Request,
   schema: z.ZodType<T>,
+  maxBytes = 16384,
 ): Promise<T> {
-  if (Number(req.headers.get("content-length")) > 16384)
+  if (Number(req.headers.get("content-length")) > maxBytes)
     throw new ApiError(413, "Request is too large.");
   const reader = req.body?.getReader();
   if (!reader) throw new ApiError(400, "Missing request body.");
@@ -76,7 +77,7 @@ export async function readBody<T>(
     const { done, value } = await reader.read();
     if (done) break;
     size += value.length;
-    if (size > 16384) {
+    if (size > maxBytes) {
       await reader.cancel();
       throw new ApiError(413, "Request is too large.");
     }

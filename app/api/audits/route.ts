@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     const { db } = await authenticate(req);
     const { data, error } = await db
       .from("audits")
-      .select("payload,stage,notes,outreach")
+      .select("payload,stage,notes,outreach,follow_up_date")
       .order("created_at", { ascending: false })
       .limit(500);
     if (error)
@@ -32,6 +32,7 @@ export async function GET(req: Request) {
         stage: a.stage,
         notes: a.notes,
         outreach: a.outreach,
+        followUpDate: a.follow_up_date,
       })),
     });
   });

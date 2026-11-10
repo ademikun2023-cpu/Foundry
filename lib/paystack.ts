@@ -1,46 +1,53 @@
+import {
+  billingAmount,
+  currencyEnabled,
+  providerCode,
+  type Currency,
+} from "./billing-catalog";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { adminDb, ApiError } from "./server";
 import {
   PLANS,
-  planDetails,
   type BillingInterval,
   type PaidPlan,
 } from "./plans";
 
-export function planCode(plan: PaidPlan, interval: BillingInterval) {
-  const code =
-    process.env[
-      `PAYSTACK_PLAN_${plan.toUpperCase()}_${interval.toUpperCase()}`
-    ];
+export function planCode(
+  plan: PaidPlan,
+  interval: BillingInterval,
+  currency: Currency = "USD",
+) {
+  const code = providerCode(plan, interval, currency);
   if (!code || !/^PLN_[a-zA-Z0-9]+$/.test(code))
     throw new ApiError(503, "This subscription is not configured yet.");
   return code;
 }
-export function billingReady() {
+export function billingReady(currency?: Currency): boolean {
+  if (!currency) return billingReady("NGN") || billingReady("USD");
   return Boolean(
     process.env.PAYSTACK_BILLING_ENABLED === "true" &&
-    process.env.PAYSTACK_SECRET_KEY &&
-    process.env.APP_URL &&
-    PLANS.every((p) =>
-      ["monthly", "yearly"].every(
-        (i) =>
-          process.env[
-            `PAYSTACK_PLAN_${p.key.toUpperCase()}_${i.toUpperCase()}`
-          ],
+      process.env.PAYSTACK_SECRET_KEY &&
+      process.env.APP_URL &&
+      currencyEnabled(currency) &&
+      PLANS.every((p) =>
+        ["monthly", "yearly"].every(
+          (i) =>
+            providerCode(p.key, i as BillingInterval, currency) &&
+            billingAmount(p.key, i as BillingInterval, currency) !== null,
+        ),
       ),
-    ),
   );
 }
 export function configuredPlan(code: string) {
-  for (const p of PLANS)
-    for (const interval of ["monthly", "yearly"] as const) {
-      if (
-        process.env[
-          `PAYSTACK_PLAN_${p.key.toUpperCase()}_${interval.toUpperCase()}`
-        ] === code
-      )
-        return { plan: p.key, interval, amount: p[interval] * 100 };
-    }
+  for (const currency of ["NGN", "USD"] as const)
+    for (const p of PLANS)
+      for (const interval of ["monthly", "yearly"] as const) {
+        if (providerCode(p.key, interval, currency) === code) {
+          const amount = billingAmount(p.key, interval, currency);
+          if (amount !== null)
+            return { plan: p.key, interval, amount, currency };
+        }
+      }
   return null;
 }
 export async function paystack<T>(path: string, body?: unknown): Promise<T> {
@@ -108,20 +115,24 @@ type ProviderPlan = {
   currency: string;
   interval: string;
 };
-export async function verifyPlan(plan: PaidPlan, interval: BillingInterval) {
-  const code = planCode(plan, interval);
+export async function verifyPlan(
+  plan: PaidPlan,
+  interval: BillingInterval,
+  currency: Currency = "USD",
+) {
+  const code = planCode(plan, interval, currency);
   const remote = await paystack<ProviderPlan>(
     `/plan/${encodeURIComponent(code)}`,
   );
   if (
     remote.plan_code !== code ||
-    remote.amount !== planDetails(plan)[interval] * 100 ||
-    remote.currency !== "USD" ||
+    remote.amount !== billingAmount(plan, interval, currency) ||
+    remote.currency !== currency ||
     remote.interval !== (interval === "yearly" ? "annually" : "monthly")
   )
     throw new ApiError(
       503,
-      "This plan's checkout configuration does not match the advertised USD price.",
+      "This plan's checkout configuration does not match the advertised price and currency.",
     );
   return code;
 }
@@ -153,7 +164,7 @@ export function validatePayment(
     tx.status !== "success" ||
     !configured ||
     transactionPlan(tx) !== code ||
-    tx.currency !== "USD" ||
+    tx.currency !== configured.currency ||
     tx.amount !== configured.amount ||
     !tx.customer?.customer_code ||
     !Number.isFinite(Date.parse(tx.paid_at)) ||
@@ -161,7 +172,7 @@ export function validatePayment(
   )
     throw new ApiError(
       409,
-      "Payment has not been confirmed for the selected USD subscription.",
+      "Payment has not been confirmed for the selected subscription.",
     );
   return configured;
 }

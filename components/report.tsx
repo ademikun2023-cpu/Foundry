@@ -3,16 +3,22 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   Check,
-  Copy,
   Download,
   FileText,
-  LoaderCircle,
   Mail,
   Printer,
   Trash2,
   X,
 } from "lucide-react";
-import type { Audit, Outreach, Stage } from "@/lib/types";
+import ReportSharing from "./report-sharing";
+import OutreachEditor from "./outreach-editor";
+import type {
+  AgencyProfile,
+  AuditChanges,
+  Audit,
+  Outreach,
+  Stage,
+} from "@/lib/types";
 import { STAGES } from "@/lib/types";
 import { downloadFile } from "@/lib/client";
 import { reportHtml } from "@/lib/report";
@@ -23,23 +29,27 @@ export default function Report({
   onDelete,
   onDraft,
   agency,
+  profile,
+  onRetry,
 }: {
   audit: Audit;
   onClose: () => void;
-  onUpdate: (
-    id: string,
-    changes: { stage?: Stage; notes?: string },
-  ) => Promise<void>;
+  onUpdate: (id: string, changes: AuditChanges) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
-  onDraft: (audit: Audit) => Promise<Outreach>;
+  onDraft: (
+    audit: Audit,
+    options?: Pick<AgencyProfile, "service" | "tone">,
+  ) => Promise<Outreach>;
   agency: string;
+  profile: AgencyProfile;
+  onRetry: (audit: Audit) => Promise<void>;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [tab, setTab] = useState("evidence");
   const [notes, setNotes] = useState(audit.notes);
+  const [followUpDate, setFollowUpDate] = useState(audit.followUpDate || "");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
   useEffect(() => {
     ref.current?.showModal();
   }, []);
@@ -72,7 +82,7 @@ export default function Report({
               onClick={() =>
                 downloadFile(
                   `foundry-audit-${audit.id}.html`,
-                  reportHtml(audit, agency),
+                  reportHtml(audit, agency, profile.logo),
                   "text/html",
                 )
               }
@@ -83,7 +93,23 @@ export default function Report({
               className="icon-btn"
               title="Print or save as PDF"
               aria-label="Print or save as PDF"
-              onClick={() => window.print()}
+              onClick={() => {
+                const url = URL.createObjectURL(
+                  new Blob([reportHtml(audit, agency, profile.logo)], {
+                    type: "text/html",
+                  }),
+                );
+                const win = window.open(url, "_blank");
+                if (win)
+                  win.addEventListener("load", () => win.print(), {
+                    once: true,
+                  });
+                else
+                  setError(
+                    "Allow pop-ups to print the report, or download the HTML report and print it from your browser.",
+                  );
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+              }}
             >
               <Printer size={17} />
             </button>
@@ -96,6 +122,13 @@ export default function Report({
             </button>
           </div>
         </div>
+        {profile.logo && (
+          <img
+            className="report-agency-logo"
+            src={profile.logo}
+            alt={`${agency} logo`}
+          />
+        )}
         <header className="report-header">
           <div>
             <span className="eyebrow">
@@ -172,6 +205,22 @@ export default function Report({
                 <strong>{audit.metrics.reviewCount ?? "—"}</strong>
               </div>
             </div>
+            {!audit.demo &&
+              (audit.metrics.performance === null ||
+                audit.metrics.booking === "unknown") && (
+                <div className="retry-checks no-print">
+                  <span>
+                    Some checks are unavailable. Saved findings are preserved.
+                  </span>
+                  <button
+                    className="btn small"
+                    disabled={Boolean(busy)}
+                    onClick={() => action("retry-checks", () => onRetry(audit))}
+                  >
+                    {busy === "retry-checks" ? "Retrying…" : "Run fresh checks"}
+                  </button>
+                </div>
+              )}
             <h3>What we found</h3>
             <div className="finding-list">
               {audit.findings.map((f, i) => (
@@ -250,6 +299,7 @@ export default function Report({
                 <p key={a}>{a}</p>
               ))}
             </section>
+            <ReportSharing id={audit.id} demo={audit.demo} />
             <section className="prospect-edit no-print">
               <h3>Your next step</h3>
               <label>
@@ -269,6 +319,18 @@ export default function Report({
                 </select>
               </label>
               <label>
+                Follow-up date
+                <input
+                  type="date"
+                  value={followUpDate}
+                  onChange={(e) => setFollowUpDate(e.target.value)}
+                />
+                <small>
+                  Shown in your workspace reminders. No message is sent
+                  automatically.
+                </small>
+              </label>
+              <label>
                 Private notes
                 <textarea
                   value={notes}
@@ -281,12 +343,21 @@ export default function Report({
               <div className="button-row spread">
                 <button
                   className="btn"
-                  disabled={Boolean(busy) || notes === audit.notes}
+                  disabled={
+                    Boolean(busy) ||
+                    (notes === audit.notes &&
+                      followUpDate === (audit.followUpDate || ""))
+                  }
                   onClick={() =>
-                    action("save", () => onUpdate(audit.id, { notes }))
+                    action("save", () =>
+                      onUpdate(audit.id, {
+                        notes,
+                        followUpDate: followUpDate || null,
+                      }),
+                    )
                   }
                 >
-                  {busy === "save" ? "Saving…" : "Save notes"}
+                  {busy === "save" ? "Saving…" : "Save next step"}
                 </button>
                 <button
                   className="btn danger"
@@ -310,75 +381,12 @@ export default function Report({
             </section>
           </div>
         ) : (
-          <div className="report-body">
-            <div className="section-heading">
-              <div>
-                <h3>A specific reason to reach out.</h3>
-                <p>
-                  Drafts reference the evidence. Review every claim before
-                  sending.
-                </p>
-              </div>
-            </div>
-            <button
-              className="btn primary"
-              disabled={Boolean(busy)}
-              onClick={() => action("draft", () => onDraft(audit))}
-            >
-              {busy === "draft" ? (
-                <LoaderCircle size={16} className="spin" />
-              ) : (
-                <Mail size={16} />
-              )}{" "}
-              {audit.outreach ? "Regenerate draft" : "Generate outreach"}
-            </button>
-            {audit.outreach && (
-              <>
-                <div className="draft-meta">
-                  {audit.outreach.source === "ai"
-                    ? "AI-assisted draft · human review required"
-                    : "Evidence-based template"}{" "}
-                  · Nothing has been sent
-                </div>
-                <div className="draft-box">
-                  <span className="eyebrow">SUBJECT</span>
-                  <h4>{audit.outreach.subject}</h4>
-                  <hr />
-                  <pre>{audit.outreach.email}</pre>
-                </div>
-                <button
-                  className="btn"
-                  onClick={() =>
-                    action("copy", async () => {
-                      await navigator.clipboard.writeText(
-                        `Subject: ${audit.outreach!.subject}\n\n${audit.outreach!.email}`,
-                      );
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    })
-                  }
-                >
-                  {copied ? <Check size={15} /> : <Copy size={15} />}{" "}
-                  {copied ? "Copied" : "Copy email"}
-                </button>
-                <div className="draft-box">
-                  <span className="eyebrow">FOLLOW-UP</span>
-                  <pre>{audit.outreach.followUp}</pre>
-                </div>
-                <button
-                  className="btn"
-                  onClick={() =>
-                    action("copy-followup", () =>
-                      navigator.clipboard.writeText(audit.outreach!.followUp),
-                    )
-                  }
-                >
-                  <Copy size={15} />
-                  Copy follow-up
-                </button>
-              </>
-            )}
-          </div>
+          <OutreachEditor
+            audit={audit}
+            profile={profile}
+            onDraft={onDraft}
+            onUpdate={onUpdate}
+          />
         )}
         <footer className="report-footer">
           Prepared with Foundry · Evidence first.
