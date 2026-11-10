@@ -11,17 +11,17 @@
 - Mobile: responsive import/queue/editor/branding panels, touch targets, readable inputs and reduced-motion support.
 - Payments: NGN and USD only. NGN prices are intentionally unconfigured until the owner chooses amounts. Each currency requires its own enable flag, approved Paystack account and matching recurring plans. No live key has been copied from VerifyPlug.
 
-## Database change requiring approval
+## Database change
 
-Apply `supabase/migrations/20261110102923_agency_workflows.sql` to the existing Foundry project before the production app release.
+The owner approved this migration on November 10, 2026. It was applied to the existing Foundry project as `20261110105918_agency_workflows`; the filename matches the recorded database version. Do not apply it again. The SQL contents are unchanged from the reviewed migration.
 
 This adds an optional follow-up date to audits, grants owners access to their follow-up dates and draft edits, and creates isolated agency profiles, report shares, audit jobs, and a service-only billing price catalogue. It adds owner-checked queue/quota functions and service-only worker functions. The existing payment validator is extended to accept explicitly configured NGN plans as well as existing exact USD prices. No user rows are deleted or existing account plans changed by the migration.
 
-The migration is transactional. It changes permissions and payment validation, so it still requires production review. Automated tests exercise cross-user access denial, queue quota atomicity, duplicate submissions, worker leases, private report-data exclusion and NGN amount/currency checks.
+The migration is transactional. Its permission and payment-validation changes were explicitly approved before application. Automated tests exercise cross-user access denial, queue quota atomicity, duplicate submissions, worker leases, private report-data exclusion and NGN amount/currency checks.
 
 ## Release order
 
-1. Approve and apply the reviewed migration; verify new tables/columns/functions and Supabase security advisors.
+1. Completed: migration applied; tables, ownership policies and privileges verified. Production transaction checks passed for profile saving, queue quota/idempotence, worker leases/completion, follow-up and outreach edits, and share ownership. All verification data was rolled back. Security advisors reported no critical finding; leaked-password protection remains disabled (existing setting).
 2. Deploy this exact tested commit to the existing Foundry Vercel project.
 3. Use a dedicated test account to check saved branding, URL/CSV submission, persistence, report sharing/revocation, follow-up dates and edited drafts.
 4. Configure payments separately after the merchant-profile decision, explicit NGN prices and currency approvals. Use test keys first. Do not collect live payments until checkout/webhook/renewal/cancellation checks pass.
@@ -32,7 +32,7 @@ The migration is transactional. It changes permissions and payment validation, s
 - Maximum five active imported jobs per user at submission. Workers claim jobs atomically; leases recover after five minutes. Failed jobs have up to three attempts. Reopening the workspace or Resume unfinished restarts recoverable work after platform interruption.
 - Provider failures can yield a completed report with explicit unknown checks. Run fresh checks creates a new audit and uses a credit, preserving the old report.
 - Sharing makes only the selected report snapshot accessible to anyone holding its link. Revoking a link cannot retract copies already downloaded by a recipient.
-- Production should not be updated before the migration is approved. Preview/demo UI can be reviewed independently; connected account flows require the new schema.
+- The migration is installed. Full signed-in browser/API verification still requires a dedicated test account; database-level checks and sample-mode browser checks do not substitute for that end-to-end flow.
 
 ## Rollback
 
