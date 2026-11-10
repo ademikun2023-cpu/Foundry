@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import ReportSharing from "./report-sharing";
 import OutreachEditor from "./outreach-editor";
+import ChoiceGroup from "./choice-group";
 import type {
   AgencyProfile,
   AuditChanges,
@@ -302,22 +303,16 @@ export default function Report({
             <ReportSharing id={audit.id} demo={audit.demo} />
             <section className="prospect-edit no-print">
               <h3>Your next step</h3>
-              <label>
-                Pipeline stage
-                <select
-                  value={audit.stage}
-                  disabled={Boolean(busy)}
-                  onChange={(e) =>
-                    action("stage", () =>
-                      onUpdate(audit.id, { stage: e.target.value as Stage }),
-                    )
-                  }
-                >
-                  {STAGES.map((s) => (
-                    <option key={s}>{s}</option>
-                  ))}
-                </select>
-              </label>
+              <ChoiceGroup<Stage>
+                label="Pipeline stage"
+                variant="chips"
+                value={audit.stage}
+                disabled={Boolean(busy)}
+                onChange={(stage) =>
+                  action("stage", () => onUpdate(audit.id, { stage }))
+                }
+                options={STAGES.map((stage) => ({ value: stage, label: stage }))}
+              />
               <label>
                 Follow-up date
                 <input

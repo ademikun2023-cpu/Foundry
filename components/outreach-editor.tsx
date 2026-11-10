@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Copy, Mail } from "lucide-react";
 import type { AgencyProfile, Audit, AuditChanges, Outreach } from "@/lib/types";
+import ChoiceGroup from "./choice-group";
 export default function OutreachEditor({
   audit,
   profile,
@@ -51,16 +52,15 @@ export default function OutreachEditor({
             maxLength={160}
           />
         </label>
-        <label>
-          Tone
-          <select
-            value={tone}
-            onChange={(e) => setTone(e.target.value as AgencyProfile["tone"])}
-          >
-            <option value="friendly">Friendly</option>
-            <option value="direct">Direct</option>
-          </select>
-        </label>
+        <ChoiceGroup<AgencyProfile["tone"]>
+          label="Tone"
+          value={tone}
+          onChange={setTone}
+          options={[
+            { value: "friendly", label: "Friendly" },
+            { value: "direct", label: "Direct" },
+          ]}
+        />
       </div>
       <button
         className="btn primary"

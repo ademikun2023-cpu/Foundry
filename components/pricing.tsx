@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { Currency } from "@/lib/billing-catalog";
 import { ArrowRight, Check } from "lucide-react";
+import ChoiceGroup from "./choice-group";
 import {
   PLANS,
   type BillingInterval,
@@ -75,44 +76,32 @@ export function PricingCards({
   return (
     <>
       <div className="billing-controls">
-        <div
-          className="billing-toggle"
-          role="group"
-          aria-label="Billing period"
-        >
-          <button
-            type="button"
-            aria-pressed={interval === "monthly"}
-            onClick={() => onInterval("monthly")}
-          >
-            Monthly
-          </button>
-          <button
-            type="button"
-            aria-pressed={interval === "yearly"}
-            onClick={() => onInterval("yearly")}
-          >
-            Yearly <span>Save more</span>
-          </button>
-        </div>
-        <label className="currency-select">
-          Billing currency
-          <select
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value as Currency)}
-          >
-            <option value="NGN">NGN · Naira</option>
-            <option value="USD">USD · US dollar</option>
-          </select>
-        </label>
-        <p>
+        <ChoiceGroup<BillingInterval>
+          label="Billing period"
+          value={interval}
+          onChange={onInterval}
+          options={[
+            { value: "monthly", label: "Monthly" },
+            { value: "yearly", label: "Yearly", note: "Save more" },
+          ]}
+        />
+        <ChoiceGroup<Currency>
+          label="Billing currency"
+          value={currency}
+          onChange={setCurrency}
+          options={[
+            { value: "NGN", label: "₦ NGN" },
+            { value: "USD", label: "$ USD" },
+          ]}
+        />
+        <p role="status" aria-live="polite" aria-atomic="true">
           {currency} ·{" "}
           {interval === "yearly"
             ? "One payment for a full year."
             : "Billed each month."}
         </p>
       </div>
-      <div className="plans">
+      <div className="plans plans-switch" key={`${currency}-${interval}`}>
         {PLANS.map((p) => (
           <article
             className={`plan ${p.key === "growth" ? "featured" : ""}`}
@@ -126,13 +115,13 @@ export function PricingCards({
             </div>
             <h3 className="plan-price">
               {amount(p.key, interval) === null
-                ? "Not configured"
+                ? "Coming soon"
                 : money(amount(p.key, interval)!)}
               <small> / {interval === "yearly" ? "year" : "month"}</small>
             </h3>
             <div className="plan-cost-note">
               {amount(p.key, interval) === null
-                ? "Naira prices will appear before checkout opens."
+                ? "Naira prices are coming soon."
                 : interval === "yearly"
                   ? `${money(amount(p.key, "yearly")! / 12)} / month equivalent. Billed annually.`
                   : "Renews monthly. Cancel future renewals anytime."}
