@@ -23,15 +23,16 @@ Open `http://localhost:3000`. No keys are required to explore `/dashboard` with 
 - Original landing-page visual direction, with working navigation into the workspace. Unsupported marketing statistics and the fake waitlist success message are removed from the served landing page.
 - Email/password sign-up, email confirmation, sign-in, reset and sign-out through Supabase Auth.
 - Google Places text search by business type and location (up to 10 results per search).
-- Individual audits and sequential batches of up to 3 businesses per batch.
+- Individual audits, search-result batches, and persisted background imports of up to 5 website URLs/CSV rows per batch.
 - Direct website audit for an existing prospect.
 - Lighthouse mobile performance and lab Largest Contentful Paint via PageSpeed Insights.
 - Homepage HTTPS, viewport, likely booking links and public social links.
 - Review-count comparison against the median of the other returned search results.
 - Transparent weighted scoring, evidence coverage, explicit unknowns and limitations.
 - Saved reports, pipeline stages, private notes, deletion, search, filtering and CSV export.
-- Downloadable standalone HTML reports and browser print / save-as-PDF.
-- Evidence-based email and follow-up drafts; optional Claude generation, with a template fallback.
+- Branded standalone HTML reports, clean print / save-as-PDF, and revocable 30-day report links that exclude private notes and outreach.
+- Editable email, DM and follow-up drafts with service/tone controls; optional Claude generation with a template fallback.
+- Persistent agency branding, a first-audit onboarding flow, and dated follow-up reminders.
 - Paystack hosted checkout, subscription management and signature-verified payment webhooks (disabled until provider setup and live acceptance checks).
 - Server-enforced monthly allowances and per-action burst limits.
 - Automated CI, security-focused tests, and a deployable production build.
@@ -86,10 +87,10 @@ npm audit --omit=dev
 
 - A workspace belongs to one signed-in user; team invitations, shared agency workspaces and white-label custom domains are future work.
 - The UI currently loads the 500 most recent saved audits. Add cursor pagination before large-volume agency use.
-- Batches run in the open browser tab. Closing the tab can interrupt remaining work; a durable background job queue is future work.
+- URL/CSV imports are persisted in PostgreSQL and processed server-side after the response, with two workers and bounded leases. Closing the tab does not cancel a submitted batch. An interrupted worker is recovered when the workspace reopens or the user selects Resume unfinished; there is no always-on cron worker. Search-result batches retain the original sequential browser workflow.
 - Searches and attempted audit/draft calls consume quota even when an upstream provider fails. Per-action bursts are limited to five calls per minute.
-- Allowances reset by UTC calendar month, independently of the subscription anniversary. USD prices are defined in `lib/plans.ts` and checked against Paystack plans before checkout; the database independently enforces the same amounts.
-- Agency/report name is session-local. Private prospect notes are persisted; notes and outreach are excluded from client report exports.
+- Allowances reset by UTC calendar month, independently of the subscription anniversary. USD prices are defined in `lib/plans.ts`. NGN prices require explicit owner configuration in integer kobo. Both currencies require an approval flag and matching Paystack plan, and the database independently validates payments.
+- Agency name/logo/service/tone are persisted per user. Shared reports are frozen snapshots; replacing a link updates branding and revokes the old link. Private notes and outreach are excluded.
 - No email or DM is sent automatically. Review generated drafts and factual claims before sending.
 - Google Analytics, Search Console, Meta Ads, recurring client reports and social activity monitoring are not included.
 - Google Maps data is attributed. Review the applicable Google Maps content-storage, export, attribution and customer-facing policy requirements before commercial launch; this implementation does not claim policy/legal certification.
@@ -101,3 +102,7 @@ npm audit --omit=dev
 - [Google Places Text Search](https://developers.google.com/maps/documentation/places/web-service/text-search)
 - [PageSpeed Insights API](https://developers.google.com/speed/docs/insights/v5/get-started)
 - [Paystack subscriptions](https://paystack.com/docs/payments/subscriptions/)
+
+## Agency workflow release
+
+See [docs/AGENCY-WORKFLOWS.md](docs/AGENCY-WORKFLOWS.md) for the migration, activation requirements, verification and rollback plan. This release requires the new migration before deploying the app to production.

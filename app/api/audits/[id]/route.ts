@@ -1,3 +1,4 @@
+import { outreachSchema } from "@/lib/agency";
 import { z } from "zod";
 import { ApiError, authenticate, json, readBody, route } from "@/lib/server";
 type Context = { params: Promise<{ id: string }> };
@@ -14,11 +15,17 @@ export async function PATCH(req: Request, context: Context) {
           .enum(["New lead", "Contacted", "Interested", "Closed"])
           .optional(),
         notes: z.string().max(5000).optional(),
+        followUpDate: z.iso.date().nullable().optional(),
+        outreach: outreachSchema.optional(),
       }),
     );
+    const { followUpDate, ...rest } = body;
     const { data, error } = await db
       .from("audits")
-      .update(body)
+      .update({
+        ...rest,
+        ...(followUpDate !== undefined ? { follow_up_date: followUpDate } : {}),
+      })
       .eq("id", id)
       .select("id")
       .single();

@@ -60,12 +60,16 @@ export type Audit = {
   warnings: string[];
   outreach?: Outreach;
   demo?: boolean;
+  followUpDate?: string | null;
 };
 export type Outreach = {
   subject: string;
   email: string;
   followUp: string;
   source: "template" | "ai";
+  dm?: string;
+  service?: string;
+  tone?: "friendly" | "direct";
 };
 export type AppConfig = {
   auth: boolean;
@@ -82,4 +86,33 @@ export type Account = {
   renewalStatus?: string | null;
   paidUntil?: string | null;
   hasSubscription?: boolean;
+};
+
+export type AgencyProfile = {
+  name: string;
+  logo: string;
+  service: string;
+  tone: "friendly" | "direct";
+};
+export const defaultProfile: AgencyProfile = {
+  name: "Your agency",
+  logo: "",
+  service: "Website improvements",
+  tone: "friendly",
+};
+export type AuditJob = {
+  id: string;
+  business: Business;
+  status: "queued" | "running" | "completed" | "failed";
+  error: string | null;
+  audit_id: string | null;
+  created_at: string;
+  started_at: string | null;
+  attempts: number;
+};
+export type AuditChanges = {
+  stage?: Stage;
+  notes?: string;
+  followUpDate?: string | null;
+  outreach?: Outreach;
 };

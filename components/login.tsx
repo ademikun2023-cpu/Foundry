@@ -7,7 +7,7 @@ import { browserDb } from "@/lib/client";
 export default function Login() {
   const params = useSearchParams();
   const [mode, setMode] = useState<"login" | "signup" | "reset" | "password">(
-    params.get("reset") === "1" ? "password" : "login",
+    params.get("reset") === "1" ? "password" : params.get("mode") === "signup" ? "signup" : "login",
   );
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
@@ -80,7 +80,7 @@ export default function Login() {
                 ? "Choose a new password."
                 : "Welcome back."}
         </h1>
-        <p>Evidence for the pitch. Clarity for the next step.</p>
+        <p>{mode === "signup" ? "Start with a free website audit. No card needed." : "Evidence for the pitch. Clarity for the next step."}</p>
         {!db && (
           <div className="notice">
             Live accounts will open once the workspace is connected. You can

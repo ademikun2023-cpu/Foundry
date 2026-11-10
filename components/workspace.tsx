@@ -37,6 +37,14 @@ import type {
 } from "@/lib/types";
 import { STAGES } from "@/lib/types";
 import Brand from "./brand";
+import AgencySettings from "./agency-settings";
+import AuditQueue from "./audit-queue";
+import {
+  defaultProfile,
+  type AgencyProfile,
+  type AuditChanges,
+} from "@/lib/types";
+import { isFollowUpDue } from "@/lib/agency";
 import Report from "./report";
 import { PricingCards } from "./pricing";
 import type { BillingInterval, PaidPlan } from "@/lib/plans";
@@ -71,10 +79,10 @@ export default function Workspace() {
     [query, setQuery] = useState(""),
     [stageFilter, setStageFilter] = useState("all"),
     [sort, setSort] = useState("score");
-  const [direct, setDirect] = useState(false),
+  const [direct, setDirect] = useState(true),
     [website, setWebsite] = useState(""),
     [businessName, setBusinessName] = useState(""),
-    [agency, setAgency] = useState("Your agency"),
+    [profile, setProfile] = useState<AgencyProfile>(defaultProfile),
     [mobile, setMobile] = useState(false);
   const [billingInterval, setBillingInterval] = useState<BillingInterval>(
     params.get("interval") === "yearly" ? "yearly" : "monthly",
@@ -122,6 +130,10 @@ export default function Workspace() {
     };
   }, [mobile]);
   const demo = !session;
+  const agency = profile.name;
+  const due = audits
+    .filter((a) => isFollowUpDue(a))
+    .sort((a, b) => (a.followUpDate || "").localeCompare(b.followUpDate || ""));
   const selectedAudit = audits.find((a) => a.id === selected);
   useEffect(() => {
     if (!session || !paymentReference || params.get("checkout") !== "return")
@@ -184,9 +196,15 @@ export default function Workspace() {
     setBusinesses([]);
     setSearched(false);
     setAccount(null);
+    setProfile(defaultProfile);
     setError("");
     if (session) {
       setAudits([]);
+      api<{ profile: AgencyProfile }>("/api/profile")
+        .then((r) => {
+          if (active) setProfile(r.profile);
+        })
+        .catch(() => {});
       Promise.all([
         api<{ audits: Audit[] }>("/api/audits"),
         api<Account>("/api/account"),
@@ -202,6 +220,10 @@ export default function Workspace() {
         });
     } else {
       try {
+        const branding = JSON.parse(
+          localStorage.getItem("foundry.sample.profile") || "null",
+        );
+        if (branding?.name) setProfile(branding);
         const saved = JSON.parse(localStorage.getItem(demoKey) || "null");
         setAudits(
           Array.isArray(saved) &&
@@ -217,6 +239,21 @@ export default function Workspace() {
       active = false;
     };
   }, [session?.user.id, loading]);
+  useEffect(() => {
+    if (!session) return;
+    try {
+      const pending = JSON.parse(
+        localStorage.getItem("foundry.first-website") || "null",
+      );
+      if (pending?.website && Date.now() - pending.createdAt < 86400000) {
+        setWebsite(pending.website);
+        setBusinessName(pending.name || "");
+        setDirect(true);
+        setView("discover");
+        localStorage.removeItem("foundry.first-website");
+      }
+    } catch {}
+  }, [session?.user.id]);
   async function refreshAccount() {
     if (!demo)
       try {
@@ -299,10 +336,7 @@ export default function Workspace() {
       );
     });
   }
-  async function update(
-    id: string,
-    changes: { stage?: Stage; notes?: string },
-  ) {
+  async function update(id: string, changes: AuditChanges) {
     if (!demo) await api(`/api/audits/${id}`, changes, "PATCH");
     const next = audits.map((a) => (a.id === id ? { ...a, ...changes } : a));
     saveAudits(next);
@@ -311,25 +345,34 @@ export default function Workspace() {
     if (!demo) await api(`/api/audits/${id}`, undefined, "DELETE");
     saveAudits(audits.filter((a) => a.id !== id));
   }
-  async function draft(audit: Audit) {
+  async function draft(
+    audit: Audit,
+    options?: Pick<AgencyProfile, "service" | "tone">,
+  ) {
     const outreach = demo
-      ? templateOutreach(audit, agency)
+      ? templateOutreach(audit, agency, options || profile)
       : (
           await api<{ outreach: Outreach }>("/api/outreach", {
             auditId: audit.id,
             agency,
+            ...(options || { service: profile.service, tone: profile.tone }),
           })
         ).outreach;
     saveAudits(audits.map((a) => (a.id === audit.id ? { ...a, outreach } : a)));
     await refreshAccount();
     return outreach;
   }
-  async function billing(action: "checkout" | "portal", plan?: PaidPlan) {
+  async function billing(
+    action: "checkout" | "portal",
+    plan?: PaidPlan,
+    currency: "NGN" | "USD" = "USD",
+  ) {
     await perform("billing", async () => {
       const result = await api<{ url: string }>("/api/billing", {
         action,
         plan,
         interval: billingInterval,
+        currency,
       });
       if (result.url) location.assign(result.url);
     });
@@ -343,6 +386,7 @@ export default function Workspace() {
         "Evidence coverage",
         "Stage",
         "Audited at",
+        "Follow-up date",
         "Sample",
       ],
       ...filtered.map((a) => [
@@ -352,6 +396,7 @@ export default function Workspace() {
         a.scoring.coverage,
         a.stage,
         a.createdAt,
+        a.followUpDate || "",
         a.demo ? "Yes" : "No",
       ]),
     ];
@@ -537,8 +582,8 @@ export default function Workspace() {
                     <strong>Take a look around.</strong> These businesses and
                     measurements are fictional. Changes stay in this browser.
                   </span>
-                  <a href="/login">
-                    Start your workspace <ArrowRight size={14} />
+                  <a href="/login?mode=signup">
+                    Run your first free audit <ArrowRight size={14} />
                   </a>
                 </div>
               )}
@@ -559,6 +604,84 @@ export default function Workspace() {
                   {notice}
                 </div>
               )}
+              {!demo && account && audits.length === 0 && (
+                <section className="onboarding-card">
+                  <div>
+                    <span className="eyebrow">
+                      YOUR FIRST REPORT STARTS HERE
+                    </span>
+                    <h2>
+                      Bring one website. Leave with a reason to reach out.
+                    </h2>
+                    <p>
+                      Your free workspace includes{" "}
+                      {account.usage.find((u) => u.action === "audit")
+                        ?.allowance || 10}{" "}
+                      audits each month. No card needed.
+                    </p>
+                  </div>
+                  <ol>
+                    <li className="complete">
+                      <Check size={15} />
+                      Create account
+                    </li>
+                    <li>2. Audit a website</li>
+                    <li>3. Share the evidence</li>
+                  </ol>
+                  <button
+                    className="btn primary"
+                    onClick={() => {
+                      setView("discover");
+                      setDirect(true);
+                      setTimeout(
+                        () =>
+                          document.getElementById("direct-website")?.focus(),
+                        0,
+                      );
+                    }}
+                  >
+                    Run your first audit
+                    <ArrowRight size={16} />
+                  </button>
+                </section>
+              )}
+              {(view === "discover" || view === "pipeline") &&
+                due.length > 0 && (
+                  <section className="followup-card">
+                    <div className="section-heading">
+                      <div>
+                        <span className="eyebrow">
+                          KEEP THE CONVERSATION MOVING
+                        </span>
+                        <h2>
+                          {due.length} follow-up{due.length === 1 ? "" : "s"}{" "}
+                          due
+                        </h2>
+                        <p>
+                          Today and overdue. Open a prospect to review your
+                          notes and draft.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="followup-list">
+                      {due.map((a) => (
+                        <button
+                          key={a.id}
+                          className="followup-row"
+                          onClick={() => setSelected(a.id)}
+                        >
+                          <span>
+                            <strong>{a.business.name}</strong>
+                            <small>
+                              {a.followUpDate} · {a.stage}
+                            </small>
+                          </span>
+                          <ArrowRight size={16} />
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )}
               {view === "discover" && (
                 <>
                   <div className="page-heading">
@@ -579,6 +702,94 @@ export default function Workspace() {
                       Audit a website
                     </button>
                   </div>
+                  {direct && (
+                    <section className="direct-card">
+                      <div className="section-heading">
+                        <div>
+                          <h2>Already have a business in mind?</h2>
+                          <p>
+                            Run a website audit. Review comparisons require a
+                            business search.
+                          </p>
+                        </div>
+                        <button
+                          className="icon-btn"
+                          aria-label="Close website audit form"
+                          onClick={() => setDirect(false)}
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                      <form
+                        className="discovery-form"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const url = /^https?:\/\//i.test(website)
+                            ? website
+                            : `https://${website}`;
+                          let name = businessName.trim();
+                          try {
+                            name ||= new URL(url).hostname.replace(
+                              /^www\./,
+                              "",
+                            );
+                          } catch {
+                            setError("Enter a valid website address.");
+                            return;
+                          }
+                          if (demo) {
+                            try { localStorage.setItem(
+                              "foundry.first-website",
+                              JSON.stringify({ name, website: url, createdAt: Date.now() }),
+                            ); } catch {}
+                            location.assign("/login?mode=signup");
+                            return;
+                          }
+                          auditBusiness({ name, website: url });
+                        }}
+                      >
+                        <label>
+                          Business name
+                          <input
+                            minLength={2}
+                            maxLength={180}
+                            placeholder="Optional — we can use the domain"
+                            value={businessName}
+                            onChange={(e) => setBusinessName(e.target.value)}
+                          />
+                        </label>
+                        <label>
+                          Website URL
+                          <input
+                            id="direct-website"
+                            type="text"
+                            inputMode="url"
+                            required
+                            placeholder="https://example.com"
+                            value={website}
+                            onChange={(e) => setWebsite(e.target.value)}
+                          />
+                        </label>
+                        <button
+                          className="btn primary"
+                          disabled={Boolean(busy)}
+                        >
+                          {busy.startsWith("audit:") ? (
+                            <LoaderCircle size={16} className="spin" />
+                          ) : (
+                            <ArrowRight size={16} />
+                          )}
+                          {demo ? "Start free audit" : "Run audit"}
+                        </button>
+                      </form>
+                    </section>
+                  )}
+                  <AuditQueue
+                    demo={demo}
+                    showForm={true}
+                    onAudits={setAudits}
+                    onOpen={setSelected}
+                  />
                   <section className="search-card">
                     <div className="section-heading">
                       <div>
@@ -665,66 +876,6 @@ export default function Workspace() {
                       ))}
                     </div>
                   </section>
-                  {direct && (
-                    <section className="direct-card">
-                      <div className="section-heading">
-                        <div>
-                          <h2>Already have a business in mind?</h2>
-                          <p>
-                            Run a website audit. Review comparisons require a
-                            business search.
-                          </p>
-                        </div>
-                        <button
-                          className="icon-btn"
-                          aria-label="Close website audit form"
-                          onClick={() => setDirect(false)}
-                        >
-                          <X size={18} />
-                        </button>
-                      </div>
-                      <form
-                        className="discovery-form"
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          auditBusiness({ name: businessName, website });
-                        }}
-                      >
-                        <label>
-                          Business name
-                          <input
-                            required
-                            minLength={2}
-                            maxLength={180}
-                            placeholder="Business name"
-                            value={businessName}
-                            onChange={(e) => setBusinessName(e.target.value)}
-                          />
-                        </label>
-                        <label>
-                          Website URL
-                          <input
-                            type="url"
-                            required
-                            placeholder="https://example.com"
-                            value={website}
-                            onChange={(e) => setWebsite(e.target.value)}
-                          />
-                        </label>
-                        <button
-                          className="btn primary"
-                          disabled={Boolean(busy)}
-                        >
-                          {busy.startsWith("audit:") ? (
-                            <LoaderCircle size={16} className="spin" />
-                          ) : (
-                            <ArrowRight size={16} />
-                          )}
-                          Run audit
-                        </button>
-                      </form>
-                    </section>
-                  )}
                   <div className="stat-grid">
                     <Stat
                       label="Saved prospects"
@@ -1013,6 +1164,13 @@ export default function Workspace() {
                               <small>
                                 {a.scoring.coverage}% evidence coverage
                               </small>
+                              {a.followUpDate && (
+                                <span
+                                  className={`followup-tag ${isFollowUpDue(a) ? "due" : ""}`}
+                                >
+                                  Follow up {a.followUpDate}
+                                </span>
+                              )}
                             </button>
                           ))}
                         {!audits.some((a) => a.stage === stage) && (
@@ -1041,26 +1199,11 @@ export default function Workspace() {
                     </div>
                   </div>
                   <div className="settings-grid">
-                    <section className="settings-card">
-                      <h2>Report identity</h2>
-                      <p>
-                        This name appears in downloaded reports and outreach
-                        drafts.
-                      </p>
-                      <label>
-                        Agency name
-                        <input
-                          value={agency}
-                          onChange={(e) => setAgency(e.target.value)}
-                          maxLength={100}
-                          minLength={2}
-                        />
-                      </label>
-                      <small>
-                        Applies to this session. Existing drafts retain the name
-                        used when generated.
-                      </small>
-                    </section>
+                    <AgencySettings
+                      profile={profile}
+                      onChange={setProfile}
+                      demo={demo}
+                    />
                     <section className="settings-card">
                       <h2>
                         Monthly usage{" "}
@@ -1154,7 +1297,9 @@ export default function Workspace() {
                     <PricingCards
                       interval={billingInterval}
                       onInterval={setBillingInterval}
-                      onChoose={(plan) => billing("checkout", plan)}
+                      onChoose={(plan, currency) =>
+                        billing("checkout", plan, currency)
+                      }
                       currentPlan={account?.plan}
                       disabled={demo || Boolean(busy)}
                       available={config.billing}
@@ -1188,6 +1333,17 @@ export default function Workspace() {
           key={selectedAudit.id}
           audit={selectedAudit}
           agency={agency}
+          profile={profile}
+          onRetry={async (audit) => {
+            if (!audit.business.website)
+              throw new Error("No website available to retry.");
+            const fresh = await scan({
+              name: audit.business.name,
+              website: audit.business.website,
+            });
+            setSelected(fresh.id);
+            await refreshAccount();
+          }}
           onClose={() => setSelected(null)}
           onUpdate={update}
           onDelete={remove}

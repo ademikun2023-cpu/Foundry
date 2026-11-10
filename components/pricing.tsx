@@ -1,8 +1,9 @@
 "use client";
+import { useEffect, useState } from "react";
+import type { Currency } from "@/lib/billing-catalog";
 import { ArrowRight, Check } from "lucide-react";
 import {
   PLANS,
-  dollars,
   type BillingInterval,
   type PaidPlan,
 } from "@/lib/plans";
@@ -17,11 +18,60 @@ export function PricingCards({
 }: {
   interval: BillingInterval;
   onInterval: (value: BillingInterval) => void;
-  onChoose?: (plan: PaidPlan) => void;
+  onChoose?: (plan: PaidPlan, currency: Currency) => void;
   currentPlan?: string;
   disabled?: boolean;
   available?: boolean;
 }) {
+  const [currency, setCurrency] = useState<Currency>("USD");
+  const [catalog, setCatalog] = useState<
+    {
+      currency: Currency;
+      enabled: boolean;
+      prices: {
+        plan: PaidPlan;
+        monthly: number | null;
+        yearly: number | null;
+      }[];
+    }[]
+  >([]);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/billing/catalog")
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .then((r) => {
+        if (active) {
+          setCatalog(r.currencies);
+          if (
+            r.currencies.find(
+              (c: { currency: string; enabled: boolean }) =>
+                c.currency === "NGN" && c.enabled,
+            )
+          )
+            setCurrency("NGN");
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+  const selected = catalog.find((c) => c.currency === currency);
+  const ready = available && Boolean(selected?.enabled);
+  const amount = (plan: PaidPlan, period: BillingInterval) =>
+    selected?.prices.find((p) => p.plan === plan)?.[period] ??
+    (currency === "USD"
+      ? PLANS.find((p) => p.key === plan)![period] * 100
+      : null);
+  const money = (value: number) =>
+    new Intl.NumberFormat(currency === "NGN" ? "en-NG" : "en-US", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: value % 100 === 0 ? 0 : 2,
+    }).format(value / 100);
   return (
     <>
       <div className="billing-controls">
@@ -45,8 +95,18 @@ export function PricingCards({
             Yearly <span>Save more</span>
           </button>
         </div>
+        <label className="currency-select">
+          Billing currency
+          <select
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value as Currency)}
+          >
+            <option value="NGN">NGN · Naira</option>
+            <option value="USD">USD · US dollar</option>
+          </select>
+        </label>
         <p>
-          USD ·{" "}
+          {currency} ·{" "}
           {interval === "yearly"
             ? "One payment for a full year."
             : "Billed each month."}
@@ -65,13 +125,17 @@ export function PricingCards({
               )}
             </div>
             <h3 className="plan-price">
-              {dollars(p[interval])}
+              {amount(p.key, interval) === null
+                ? "Not configured"
+                : money(amount(p.key, interval)!)}
               <small> / {interval === "yearly" ? "year" : "month"}</small>
             </h3>
             <div className="plan-cost-note">
-              {interval === "yearly"
-                ? `${dollars(p.yearly / 12)} / month equivalent · save ${dollars(p.monthly * 12 - p.yearly)} a year`
-                : "Renews monthly. Cancel future renewals anytime."}
+              {amount(p.key, interval) === null
+                ? "Naira prices will appear before checkout opens."
+                : interval === "yearly"
+                  ? `${money(amount(p.key, "yearly")! / 12)} / month equivalent. Billed annually.`
+                  : "Renews monthly. Cancel future renewals anytime."}
             </div>
             <p>{p.description}</p>
             <ul>
@@ -95,12 +159,17 @@ export function PricingCards({
             {onChoose ? (
               <button
                 className={`btn full ${p.key === "growth" ? "primary" : ""}`}
-                disabled={disabled || !available || currentPlan === p.key}
-                onClick={() => onChoose(p.key)}
+                disabled={
+                  disabled ||
+                  !ready ||
+                  amount(p.key, interval) === null ||
+                  currentPlan === p.key
+                }
+                onClick={() => onChoose(p.key, currency)}
               >
                 {currentPlan === p.key
                   ? "Current plan"
-                  : available
+                  : ready
                     ? `Choose ${p.name}`
                     : "Payments coming soon"}
                 <ArrowRight size={15} />

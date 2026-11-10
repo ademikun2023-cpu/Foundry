@@ -1,3 +1,4 @@
+import { billingAmount } from "@/lib/billing-catalog";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
@@ -17,7 +18,6 @@ import {
   paystack,
   verifyPlan,
 } from "@/lib/paystack";
-import { planDetails } from "@/lib/plans";
 export const runtime = "nodejs";
 export async function POST(req: Request) {
   return route(req, async () => {
@@ -28,6 +28,7 @@ export async function POST(req: Request) {
         action: z.enum(["checkout", "portal", "verify"]),
         plan: z.enum(["starter", "growth", "agency"]).optional(),
         interval: z.enum(["monthly", "yearly"]).default("monthly"),
+        currency: z.enum(["NGN", "USD"]).default("USD"),
         reference: z
           .string()
           .regex(/^[a-zA-Z0-9.=-]{1,150}$/)
@@ -60,14 +61,31 @@ export async function POST(req: Request) {
       );
       return json({ url: paymentUrl(result.link, true) });
     }
-    if (!billingReady())
+    if (!billingReady(input.currency))
       throw new ApiError(503, "Paid subscriptions are not open yet.");
     if (!input.plan || !user.email || !user.email_confirmed_at)
       throw new ApiError(
         400,
         "Choose a plan and sign in with a verified email.",
       );
-    const code = await verifyPlan(input.plan, input.interval);
+    const code = await verifyPlan(input.plan, input.interval, input.currency);
+    const amount = billingAmount(input.plan, input.interval, input.currency);
+    if (amount === null)
+      throw new ApiError(503, "This currency has no configured price yet.");
+    const { error: priceError } = await admin
+      .from("billing_prices")
+      .upsert(
+        {
+          plan_code: code,
+          plan: input.plan,
+          billing_interval: input.interval,
+          currency: input.currency,
+          amount,
+        },
+        { onConflict: "plan_code", ignoreDuplicates: true },
+      );
+    if (priceError)
+      throw new ApiError(503, "Checkout pricing is temporarily unavailable.");
     const { data: checkout, error } = await admin.rpc(
       "reserve_paystack_checkout",
       {
@@ -100,8 +118,8 @@ export async function POST(req: Request) {
       reference: string;
     }>("/transaction/initialize", {
       email: user.email,
-      amount: String(planDetails(input.plan)[input.interval] * 100),
-      currency: "USD",
+      amount: String(amount),
+      currency: input.currency,
       reference: checkout.reference,
       plan: code,
       channels: ["card"],

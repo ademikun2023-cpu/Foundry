@@ -24,6 +24,7 @@ function setup() {
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service";
   process.env.APP_URL = "http://localhost:3000";
+  process.env.PAYSTACK_USD_ENABLED = "true";
   planKeys.forEach((key, i) => {
     process.env[key] = `PLN_test${i}`;
   });
@@ -33,6 +34,7 @@ function cleanup() {
     ...planKeys,
     "PAYSTACK_SECRET_KEY",
     "PAYSTACK_BILLING_ENABLED",
+    "PAYSTACK_USD_ENABLED",
     "NEXT_PUBLIC_SUPABASE_URL",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
@@ -69,7 +71,7 @@ test("all six prices are exact and checkout requires explicit enablement", () =>
     assert.equal(billingReady(), true);
     assert.deepEqual(
       validatePayment(transaction(), "foundry-test", "PLN_test1"),
-      { plan: "starter", interval: "yearly", amount: 20000 },
+      { plan: "starter", interval: "yearly", amount: 20000, currency: "USD" },
     );
     for (const change of [
       { amount: 3000 },
@@ -302,6 +304,8 @@ test("checkout sends the server-selected yearly total and reuses a saved provide
             interval: "annually",
           },
         });
+      if (url.includes("/billing_prices"))
+        return new Response(null, { status: 201 });
       if (url.includes("/rpc/reserve_paystack_checkout"))
         return Response.json({
           reference: "foundry-reserved",
