@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Check, Upload } from "lucide-react";
 import { api } from "@/lib/client";
 import type { AgencyProfile } from "@/lib/types";
+import ChoiceGroup from "./choice-group";
 export default function AgencySettings({
   profile,
   onChange,
@@ -123,21 +124,15 @@ export default function AgencySettings({
             required
           />
         </label>
-        <label>
-          Outreach tone
-          <select
-            value={profile.tone}
-            onChange={(e) =>
-              onChange({
-                ...profile,
-                tone: e.target.value as AgencyProfile["tone"],
-              })
-            }
-          >
-            <option value="friendly">Friendly and conversational</option>
-            <option value="direct">Direct and concise</option>
-          </select>
-        </label>
+        <ChoiceGroup<AgencyProfile["tone"]>
+          label="Outreach tone"
+          value={profile.tone}
+          onChange={(tone) => onChange({ ...profile, tone })}
+          options={[
+            { value: "friendly", label: "Friendly" },
+            { value: "direct", label: "Direct" },
+          ]}
+        />
         <small>
           New report links use your saved branding. Existing shared snapshots
           and drafts keep their original version.

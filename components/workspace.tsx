@@ -47,6 +47,7 @@ import {
 import { isFollowUpDue } from "@/lib/agency";
 import Report from "./report";
 import { PricingCards } from "./pricing";
+import ChoiceGroup from "./choice-group";
 import type { BillingInterval, PaidPlan } from "@/lib/plans";
 
 type View = "discover" | "prospects" | "pipeline" | "settings";
@@ -1087,24 +1088,27 @@ export default function Workspace() {
                         onChange={(e) => setQuery(e.target.value)}
                       />
                     </div>
-                    <select
-                      aria-label="Filter by stage"
-                      value={stageFilter}
-                      onChange={(e) => setStageFilter(e.target.value)}
-                    >
-                      <option value="all">All stages</option>
-                      {STAGES.map((s) => (
-                        <option key={s}>{s}</option>
-                      ))}
-                    </select>
-                    <select
-                      aria-label="Sort prospects"
+                    <ChoiceGroup
+                      className="prospect-sort"
+                      label="Sort prospects"
                       value={sort}
-                      onChange={(e) => setSort(e.target.value)}
-                    >
-                      <option value="score">Highest opportunity</option>
-                      <option value="recent">Most recent</option>
-                    </select>
+                      onChange={setSort}
+                      options={[
+                        { value: "score", label: "Top opportunity" },
+                        { value: "recent", label: "Most recent" },
+                      ]}
+                    />
+                    <ChoiceGroup
+                      className="prospect-stages"
+                      label="Filter by stage"
+                      variant="chips"
+                      value={stageFilter}
+                      onChange={setStageFilter}
+                      options={[
+                        { value: "all", label: "All stages" },
+                        ...STAGES.map((stage) => ({ value: stage, label: stage })),
+                      ]}
+                    />
                   </div>
                   <AuditTable audits={filtered} onOpen={setSelected} />
                 </>
